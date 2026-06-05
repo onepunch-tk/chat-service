@@ -1,0 +1,39 @@
+{
+	"name": "@repo/db",
+	"version": "0.0.0",
+	"private": true,
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./schemas": {
+			"types": "./dist/schemas/index.d.ts",
+			"default": "./dist/schemas/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+		"lint": "biome check --write",
+		"typecheck": "tsc --noEmit",
+		"db:generate": "drizzle-kit generate --config drizzle/drizzle.config.ts",
+		"db:migrate": "drizzle-kit migrate --config drizzle/drizzle.config.ts",
+		"db:push": "drizzle-kit push --config drizzle/drizzle.config.ts",
+		"db:studio": "drizzle-kit studio --config drizzle/drizzle.config.ts"
+	},
+	"dependencies": {
+		"drizzle-orm": "^0.45.2",
+		"pg": "^8.21.0"
+	},
+	"devDependencies": {
+		"@repo/biome-config": "*",
+		"@repo/typescript-config": "*",
+		"@types/node": "^24.0.0",
+		"@types/pg": "^8.20.0",
+		"drizzle-kit": "^0.31.10",
+		"typescript": "5.9.2"
+	}
+}

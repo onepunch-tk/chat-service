@@ -11,11 +11,31 @@
 			"dependsOn": ["^lint"]
 		},
 		"typecheck": {
-			"dependsOn": ["^typecheck"]
+			"dependsOn": ["^build", "^typecheck"]
+		},
+		"test": {
+			"dependsOn": ["^build"]
 		},
 		"dev": {
+			"dependsOn": ["^build"],
 			"cache": false,
 			"persistent": true
+		},
+		"db:generate": {
+			"cache": false
+		},
+		"db:migrate": {
+			"cache": false,
+			"env": ["DATABASE_URL"]
+		},
+		"db:push": {
+			"cache": false,
+			"env": ["DATABASE_URL"]
+		},
+		"db:studio": {
+			"cache": false,
+			"persistent": true,
+			"env": ["DATABASE_URL"]
 		}
 	}
 }

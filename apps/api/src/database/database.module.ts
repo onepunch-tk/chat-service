@@ -6,8 +6,8 @@ import {
 	OnApplicationShutdown,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { createDbClient } from "@repo/db";
 import type { DbClient, DrizzleDB, DrizzleLogger } from "@repo/db";
+import { createDbClient } from "@repo/db";
 
 class QueryLogger implements DrizzleLogger {
 	private readonly logger = new Logger("DrizzleQuery");

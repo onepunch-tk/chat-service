@@ -5,7 +5,7 @@ const {
 	PG_PORT = "5432",
 	PG_USERNAME = "postgres",
 	PG_PASSWORD = "postgres",
-	PG_DBNAME = "fastsns",
+	PG_DBNAME = "chat-service",
 } = process.env;
 
 // 경로는 config 파일 위치가 아니라 명령 실행 위치(packages/db) 기준이다.

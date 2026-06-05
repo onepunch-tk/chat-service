@@ -1,0 +1,31 @@
+{
+	"name": "@repo/shared-types",
+	"version": "0.0.0",
+	"private": true,
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./dto": {
+			"types": "./dist/dto/index.d.ts",
+			"default": "./dist/dto/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+		"lint": "biome check --write",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"zod": "^4.4.3"
+	},
+	"devDependencies": {
+		"@repo/biome-config": "*",
+		"@repo/typescript-config": "*",
+		"typescript": "5.9.2"
+	}
+}

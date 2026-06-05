@@ -1,0 +1,28 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.3.8/schema.json",
+	"root": false,
+	"files": {
+		"ignoreUnknown": true,
+		"includes": ["**", "!dist/**", "!coverage/**", "!.vite/**", "!**/vite-env.d.ts"]
+	},
+	"linter": {
+		"domains": {
+			"react": "recommended"
+		},
+		"rules": {
+			"correctness": {
+				"useExhaustiveDependencies": "warn"
+			},
+			"style": {
+				"useImportType": "error"
+			},
+			"suspicious": {
+				"noCommentText": "error",
+				"noDuplicateJsxProps": "error"
+			}
+		}
+	},
+	"javascript": {
+		"jsxRuntime": "transparent"
+	}
+}

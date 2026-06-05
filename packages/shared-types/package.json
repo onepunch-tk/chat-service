@@ -21,7 +21,8 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"zod": "^4.4.3"
+		"zod": "^4.4.3",
+		"@repo/db": "*"
 	},
 	"devDependencies": {
 		"@repo/biome-config": "*",

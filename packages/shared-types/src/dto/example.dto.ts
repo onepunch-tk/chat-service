@@ -12,3 +12,13 @@ import { z } from "zod";
 
   export type CreateMessageInput = z.infer<typeof createMessageSchema>;
  */
+/**
+ * import { createZodDto } from "nestjs-zod";
+  import { createMessageSchema } from "@repo/shared-types";
+
+  export class CreateMessageDto extends createZodDto(createMessageSchema) {}
+
+  @Post()
+  create(@Body() body: CreateMessageDto) { ... } // ✅ 자동 검증됨
+
+ */

@@ -92,6 +92,7 @@
       "name": "@repo/shared-types",
       "version": "0.0.0",
       "dependencies": {
+        "@repo/db": "*",
         "zod": "^4.4.3",
       },
       "devDependencies": {

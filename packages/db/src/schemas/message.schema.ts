@@ -7,15 +7,18 @@ import {
 	pgTable,
 	text,
 	timestamp,
+	unique,
 } from "drizzle-orm/pg-core";
-import { chatRooms } from "./chat-room.schema";
+import { chatRooms, SelectChatRoom } from "./chat-room.schema";
 import { createdAt, id } from "./columns";
-import { users } from "./user.schema";
+import { SelectUser, users } from "./user.schema";
 
 export const messageTypesEnum = pgEnum("message_types_enum", [
 	"TEXT",
 	"SYSTEM",
 ]);
+
+export type MessageType = (typeof messageTypesEnum.enumValues)[number];
 
 export const messages = pgTable(
 	"messages",
@@ -31,18 +34,14 @@ export const messages = pgTable(
 		content: text(),
 		isEdited: boolean("is_edited").notNull().default(false),
 		isDeleted: boolean("is_deleted").notNull().default(false),
-		sequenceNumber: bigint("sequence_number", { mode: "number" })
-			.notNull()
-			.default(0),
+		sequenceNumber: bigint("sequence_number", { mode: "number" }).notNull(),
 		editedAt: timestamp("edited_at"),
 		...createdAt,
 	},
 	(t) => [
+		unique("uq_message_room_sequence").on(t.chatRoomId, t.sequenceNumber),
 		index("idx_message_chat_room_id").on(t.chatRoomId),
 		index("idx_message_sender_id").on(t.senderId),
-		index("idx_message_created_at").on(t.createdAt),
-		index("idx_message_room_time").on(t.chatRoomId, t.createdAt),
-		index("idx_message_room_sequence").on(t.chatRoomId, t.sequenceNumber),
 	],
 );
 
@@ -59,3 +58,7 @@ export const messagesRelations = relations(messages, ({ one }) => ({
 
 export type InsertMessage = typeof messages.$inferInsert;
 export type SelectMessage = typeof messages.$inferSelect;
+export type MessageWithRelations = SelectMessage & {
+	chatRoom: SelectChatRoom;
+	sender: SelectUser;
+};

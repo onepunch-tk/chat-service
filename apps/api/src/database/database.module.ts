@@ -6,19 +6,9 @@ import {
 	OnApplicationShutdown,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import type { DbClient, DrizzleDB, DrizzleLogger } from "@repo/db";
+import type { DbClient, DrizzleDB } from "@repo/db";
 import { createDbClient } from "@repo/db";
-
-class QueryLogger implements DrizzleLogger {
-	private readonly logger = new Logger("DrizzleQuery");
-
-	logQuery(query: string, params: unknown[]): void {
-		this.logger.log(`${query} -- params: ${JSON.stringify(params)}`);
-	}
-}
-
-export const DB_CLIENT = Symbol("DB_CLIENT");
-export const DRIZZLE = Symbol("DRIZZLE");
+import { DB_CLIENT, DRIZZLE, QueryLogger } from "./database.constant";
 
 @Global()
 @Module({

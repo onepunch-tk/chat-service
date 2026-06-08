@@ -30,7 +30,9 @@ export const chatRoomMembers = pgTable(
 			.references(() => users.id),
 		role: memberRolesEnum().notNull().default("MEMBER"),
 		isActive: boolean("is_active").notNull().default(true),
-		lastReadMessageId: bigint("last_read_message_id", { mode: "number" }),
+		lastReadSeq: bigint("last_read_seq", { mode: "number" })
+			.notNull()
+			.default(0),
 		joinedAt: timestamp("joined_at").notNull().defaultNow(),
 		leftAt: timestamp("left_at"),
 		...createdAt,

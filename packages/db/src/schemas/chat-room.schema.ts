@@ -13,11 +13,13 @@ import { id, timestamps } from "./columns";
 import { messages } from "./message.schema";
 import { users } from "./user.schema";
 
-export const chatRoomTypesEnum = pgEnum("chat_room_types_enum", [
+const chatRoomTypesEnum = pgEnum("chat_room_types_enum", [
 	"DIRECT",
 	"GROUP",
 	"CHANNEL",
 ]);
+
+export type ChatRoomType = (typeof chatRoomTypesEnum.enumValues)[number];
 
 export const chatRooms = pgTable(
 	"chat_rooms",
@@ -32,12 +34,15 @@ export const chatRooms = pgTable(
 		createdBy: bigint("created_by", { mode: "number" })
 			.notNull()
 			.references(() => users.id),
+		lastSeq: bigint("last_seq", { mode: "number" }).notNull().default(0),
 		...timestamps,
 	},
 	(t) => [
 		index("idx_chat_room_created_by").on(t.createdBy),
 		index("idx_chat_room_type").on(t.type),
 		index("idx_chat_room_active").on(t.isActive),
+		index("idx_chat_room_updated_cursor").on(t.updatedAt, t.id),
+		index("idx_chat_room_name_tgram").using("gin", t.name.op("gin_trgm_ops")),
 	],
 );
 

@@ -8,14 +8,17 @@ export class RedisIoAdapter extends IoAdapter {
 
 	async connect(redisClient: RedisClientType) {
 		const pubClient = redisClient;
+
 		const subClient = redisClient.duplicate();
 		await subClient.connect();
+
 		this.adapter = createAdapter(pubClient, subClient);
 	}
 
 	createIOServer(port: number, options?: ServerOptions) {
 		const server: Server = super.createIOServer(port, options);
 		server.adapter(this.adapter);
+
 		return server;
 	}
 }

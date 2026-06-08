@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { bigint, timestamp } from "drizzle-orm/pg-core";
 
 export const id = {
@@ -13,5 +14,5 @@ export const timestamps = {
 	updatedAt: timestamp("updated_at")
 		.defaultNow()
 		.notNull()
-		.$onUpdate(() => new Date()),
+		.$onUpdate(() => sql`now()`),
 };

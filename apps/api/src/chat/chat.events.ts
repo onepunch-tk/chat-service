@@ -7,6 +7,12 @@
  */
 export interface ChatDomainEvents {
 	"chatRoom.created": { creatorId: number; roomId: number };
+	"chatRoom.memberLeft": { userId: number; roomId: number };
 }
 
-export type ChatEventName = keyof ChatDomainEvents;
+/**
+ * @OnEvent 데코레이터용 이벤트 이름 가드. emit 측은 TypedEventEmitter가 이미 이름을
+ * 강제하지만 @OnEvent 문자열은 무검증이라, 이 헬퍼로 keyof ChatDomainEvents에 묶어
+ * 오타를 컴파일 에러로 만든다. ws.dto.ts의 clientEvent()와 같은 패턴.
+ */
+export const chatEvent = <K extends keyof ChatDomainEvents>(name: K) => name;

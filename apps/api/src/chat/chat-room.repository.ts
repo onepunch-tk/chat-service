@@ -12,6 +12,7 @@ import {
 import { chatRoomMembers, chatRooms, SelectChatRoom } from "@repo/db/schemas";
 import type { CreateChatRoomInput, CursorPageInput } from "@repo/shared-types";
 import { DRIZZLE } from "../database/database.constant";
+import { escapeLike } from "../database/like.util";
 import { ChatRoomMemberRepository } from "./chat-room-member.repository";
 
 @Injectable()
@@ -88,7 +89,10 @@ export class ChatRoomRepository {
 			.select()
 			.from(chatRooms)
 			.where(
-				and(ilike(chatRooms.name, `%${name}%`), eq(chatRooms.isActive, true)),
+				and(
+					ilike(chatRooms.name, `%${escapeLike(name)}%`),
+					eq(chatRooms.isActive, true),
+				),
 			)
 			.orderBy(desc(chatRooms.createdAt));
 	}

@@ -13,7 +13,8 @@ import {
 } from "@repo/db";
 import {
 	chatRooms,
-	MessageWithRelations,
+	MessageWithAllRelations,
+	MessageWithSenderRelations,
 	messages,
 	SelectMessage,
 	users,
@@ -32,7 +33,7 @@ export class MessageRepository {
 	async findByChatRoomId(
 		chatRoomId: number,
 		{ cursor, limit }: CursorPageInput,
-	): Promise<MessageWithRelations[]> {
+	): Promise<MessageWithAllRelations[]> {
 		return this.db
 			.select({
 				...getTableColumns(messages),
@@ -53,10 +54,16 @@ export class MessageRepository {
 			.orderBy(desc(messages.sequenceNumber));
 	}
 
-	async findLatestMessage(chatRoomId: number): Promise<SelectMessage | null> {
+	async findLatestMessage(
+		chatRoomId: number,
+	): Promise<MessageWithSenderRelations | null> {
 		const [message] = await this.db
-			.select()
+			.select({
+				...getTableColumns(messages),
+				sender: getTableColumns(users),
+			})
 			.from(messages)
+			.innerJoin(users, eq(users.id, messages.senderId))
 			.where(
 				and(eq(messages.chatRoomId, chatRoomId), eq(messages.isDeleted, false)),
 			)

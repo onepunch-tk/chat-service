@@ -10,7 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { chatRooms } from "./chat-room.schema";
 import { createdAt, id } from "./columns";
-import { users } from "./user.schema";
+import { SelectUser, users } from "./user.schema";
 
 export const memberRolesEnum = pgEnum("member_roles_enum", [
 	"OWNER",
@@ -64,3 +64,6 @@ export const chatRoomMembersRelations = relations(
 
 export type InsertChatRoomMembers = typeof chatRoomMembers.$inferInsert;
 export type SelectChatRoomMembers = typeof chatRoomMembers.$inferSelect;
+export type ChatRoomMemberWithMemberRelations = SelectChatRoomMembers & {
+	user: SelectUser;
+};

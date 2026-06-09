@@ -92,8 +92,14 @@ export interface MessageDto
 	sender: UserDto;
 }
 
+// lastSeq는 방별 메시지 시퀀스용 내부 카운터다. wire로 내보내면 방의 메시지 볼륨이
+// 드러나는 단조 카운터를 노출하는 셈이고 Kotlin 원본 DTO에도 없으므로 Omit한다.
+// 주의: 타입에서 Omit해도 chatRoomToDto의 `...rest` 스프레드로는 런타임에 여전히
+// 새어나가므로(스프레드 속성엔 excess property check 미적용), 매퍼 구조분해에서도 빼야 한다.
 export interface ChatRoomDto
-	extends Serialized<Omit<SelectChatRoom, "createdBy" | "updatedAt">> {
+	extends Serialized<
+		Omit<SelectChatRoom, "createdBy" | "updatedAt" | "lastSeq">
+	> {
 	memberCount: number;
 	createdBy: UserDto;
 	lastMessage: MessageDto | null;

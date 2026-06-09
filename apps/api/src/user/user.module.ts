@@ -6,5 +6,6 @@ import { UserService } from "./user.service";
 @Module({
 	imports: [CryptoModule],
 	providers: [UserRepository, UserService],
+	exports: [UserRepository],
 })
 export class UserModule {}

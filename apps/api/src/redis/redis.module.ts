@@ -1,6 +1,7 @@
 import { Inject, Logger, Module, OnApplicationShutdown } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { createClient, type RedisClientType } from "redis";
+import { CacheService } from "./cache.service";
 import { REDIS_CLIENT } from "./redis.constant";
 import { RedisService } from "./redis.service";
 
@@ -24,8 +25,9 @@ import { RedisService } from "./redis.service";
 			inject: [ConfigService],
 		},
 		RedisService,
+		CacheService,
 	],
-	exports: [REDIS_CLIENT, RedisService],
+	exports: [REDIS_CLIENT, RedisService, CacheService],
 })
 export class RedisModule implements OnApplicationShutdown {
 	constructor(

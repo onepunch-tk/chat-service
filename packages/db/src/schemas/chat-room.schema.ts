@@ -11,7 +11,7 @@ import {
 import { chatRoomMembers } from "./chat-room-member.schema";
 import { id, timestamps } from "./columns";
 import { messages } from "./message.schema";
-import { users } from "./user.schema";
+import { SelectUser, users } from "./user.schema";
 
 const chatRoomTypesEnum = pgEnum("chat_room_types_enum", [
 	"DIRECT",
@@ -57,3 +57,6 @@ export const chatRoomsRelations = relations(chatRooms, ({ one, many }) => ({
 
 export type InsertChatRoom = typeof chatRooms.$inferInsert;
 export type SelectChatRoom = typeof chatRooms.$inferSelect;
+export type ChatRoomWithRelations = SelectChatRoom & {
+	creator: SelectUser;
+};

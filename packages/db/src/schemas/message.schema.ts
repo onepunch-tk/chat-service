@@ -58,7 +58,10 @@ export const messagesRelations = relations(messages, ({ one }) => ({
 
 export type InsertMessage = typeof messages.$inferInsert;
 export type SelectMessage = typeof messages.$inferSelect;
-export type MessageWithRelations = SelectMessage & {
+export type MessageWithSenderRelations = SelectMessage & {
+	sender: SelectUser;
+};
+export type MessageWithAllRelations = SelectMessage & {
 	chatRoom: SelectChatRoom;
 	sender: SelectUser;
 };

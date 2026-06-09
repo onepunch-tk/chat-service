@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import {
 	and,
 	asc,
@@ -80,8 +80,6 @@ export class MessageRepository {
 				.set({ lastSeq: sql`${chatRooms.lastSeq} + 1` })
 				.where(eq(chatRooms.id, newMessage.chatRoomId))
 				.returning({ lastSeq: chatRooms.lastSeq });
-
-			if (!room) throw new NotFoundException("채팅방을 찾을 수 없습니다.");
 
 			const [message] = await tx
 				.insert(messages)

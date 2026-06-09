@@ -18,6 +18,8 @@ export const memberRolesEnum = pgEnum("member_roles_enum", [
 	"MEMBER",
 ]);
 
+export type MemberRolesType = (typeof memberRolesEnum.enumValues)[number];
+
 export const chatRoomMembers = pgTable(
 	"chat_room_members",
 	{

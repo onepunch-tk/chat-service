@@ -1,11 +1,19 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, type DrizzleDB, eq, sql } from "@repo/db";
 import { chatRoomMembers, type SelectChatRoomMembers } from "@repo/db/schemas";
+import { JoinMemberInput } from "@repo/shared-types";
 import { DRIZZLE } from "../database/database.constant";
 
 @Injectable()
 export class ChatRoomMemberRepository {
 	constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+
+	async joinMember(
+		joinMember: JoinMemberInput,
+		db: DrizzleDB = this.db,
+	): Promise<void> {
+		await db.insert(chatRoomMembers).values(joinMember);
+	}
 
 	async findActiveMembers(
 		chatRoomId: number,

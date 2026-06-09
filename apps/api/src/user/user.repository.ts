@@ -1,14 +1,32 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { count, type DrizzleDB, desc, eq, ilike, or, sql } from "@repo/db";
 import { SelectUser, users } from "@repo/db/schemas";
-import type { SearchUserInput } from "@repo/shared-types";
+import type { CreateUserInput, SearchUserInput } from "@repo/shared-types";
+import { CryptoService } from "../crypto/crypto.service";
 import { DRIZZLE } from "../database/database.constant";
 
 @Injectable()
 export class UserRepository {
-	constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+	constructor(
+		@Inject(DRIZZLE) private readonly db: DrizzleDB,
+		private readonly cryptoService: CryptoService,
+	) {}
 
-	async createUser() {}
+	async createUser(newUser: CreateUserInput): Promise<SelectUser> {
+		const { username, password: plainPassword, displayName } = newUser;
+		const hashedPassword = await this.cryptoService.passwordHash(plainPassword);
+
+		const [user] = await this.db
+			.insert(users)
+			.values({
+				username,
+				displayName,
+				password: hashedPassword,
+			})
+			.returning();
+
+		return user;
+	}
 
 	async findByUsername(username: string): Promise<SelectUser | null> {
 		const [user] = await this.db

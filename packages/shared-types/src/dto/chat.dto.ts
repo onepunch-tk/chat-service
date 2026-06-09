@@ -1,7 +1,9 @@
 import type {
 	ChatRoomType,
 	InsertChatRoom,
+	InsertChatRoomMembers,
 	InsertMessage,
+	MemberRolesType,
 	MessageType,
 	SelectChatRoom,
 	SelectChatRoomMembers,
@@ -23,6 +25,12 @@ export const MESSAGE_TYPES = [
 	"SYSTEM",
 ] as const satisfies readonly MessageType[];
 
+export const MEMBER_ROLES = [
+	"OWNER",
+	"ADMIN",
+	"MEMBER",
+] as const satisfies readonly MemberRolesType[];
+
 export const createChatRoomSchema = z.object({
 	name: z
 		.string({ error: "채팅방 이름은 필수입니다." })
@@ -42,6 +50,16 @@ export const createChatRoomSchema = z.object({
 	>
 >;
 export type CreateChatRoomInput = z.infer<typeof createChatRoomSchema>;
+
+export const JoinMemeberSchema = z.object({
+	chatRoomId: z.int(),
+	userId: z.int(),
+	role: z.enum(MEMBER_ROLES),
+}) satisfies z.ZodType<
+	Pick<InsertChatRoomMembers, "userId" | "chatRoomId" | "role">
+>;
+
+export type JoinMemberInput = z.infer<typeof JoinMemeberSchema>;
 
 export const sendMessageSchema = z.object({
 	chatRoomId: z.int({ error: "채팅방 ID는 필수입니다." }).positive(),

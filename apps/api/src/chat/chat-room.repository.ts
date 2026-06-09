@@ -10,12 +10,42 @@ import {
 	sql,
 } from "@repo/db";
 import { chatRoomMembers, chatRooms, SelectChatRoom } from "@repo/db/schemas";
-import type { CursorPageInput } from "@repo/shared-types";
+import type { CreateChatRoomInput, CursorPageInput } from "@repo/shared-types";
 import { DRIZZLE } from "../database/database.constant";
+import { ChatRoomMemberRepository } from "./chat-room-member.repository";
 
 @Injectable()
 export class ChatRoomRepository {
-	constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+	constructor(
+		@Inject(DRIZZLE) private readonly db: DrizzleDB,
+		private readonly chatRoomMemberRepository: ChatRoomMemberRepository,
+	) {}
+
+	async createChatRoom(
+		userId: number,
+		newChatRoom: CreateChatRoomInput,
+	): Promise<SelectChatRoom> {
+		return this.db.transaction(async (tx) => {
+			const [chatRoom] = await tx
+				.insert(chatRooms)
+				.values({
+					...newChatRoom,
+					createdBy: userId,
+				})
+				.returning();
+
+			await this.chatRoomMemberRepository.joinMember(
+				{
+					chatRoomId: chatRoom.id,
+					userId: chatRoom.createdBy,
+					role: "OWNER",
+				},
+				tx,
+			);
+
+			return chatRoom;
+		});
+	}
 
 	async findChatRoomsByUserId(
 		userId: number,

@@ -20,3 +20,21 @@ export const searchQuerySchema = z.object({
 	offset: z.int().min(0).default(0),
 });
 export type SearchQueryInput = z.infer<typeof searchQuerySchema>;
+
+export const cursorPageSchema = z.object({
+	cursor: z.int().positive().nullish().default(null),
+	limit: z.int().min(1).max(100).default(20),
+});
+export type CursorPageInput = z.infer<typeof cursorPageSchema>;
+
+export const searchCursorPageSchema = cursorPageSchema.extend({
+	query: z.preprocess(
+		(v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+		z
+			.string()
+			.trim()
+			.min(2, { error: "검색어는 2자 이상이어야 합니다." })
+			.optional(),
+	),
+});
+export type SearchCursorPageInput = z.infer<typeof searchCursorPageSchema>;

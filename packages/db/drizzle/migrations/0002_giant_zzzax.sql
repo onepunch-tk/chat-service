@@ -1,0 +1,1 @@
+CREATE INDEX "idx_chat_room_created_cursor" ON "chat_rooms" USING btree ("created_at","id");

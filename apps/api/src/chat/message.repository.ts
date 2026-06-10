@@ -7,6 +7,7 @@ import {
 	eq,
 	getTableColumns,
 	gte,
+	inArray,
 	lt,
 	lte,
 	sql,
@@ -54,23 +55,30 @@ export class MessageRepository {
 			.orderBy(desc(messages.sequenceNumber));
 	}
 
-	async findLatestMessage(
-		chatRoomId: number,
-	): Promise<MessageWithSenderRelations | null> {
-		const [message] = await this.db
-			.select({
+	async findLatestMessagesByRoomIds(
+		roomIds: number[],
+	): Promise<Map<number, MessageWithSenderRelations>> {
+		// DISTINCT ON (chat_room_id): Postgres 확장 — chatRoomId가 같은 행들 중 ORDER BY
+		// 순서상 첫 행만 남긴다. ORDER BY는 반드시 DISTINCT ON 컬럼으로 시작해야 하며,
+		// 두 번째 키 sequenceNumber DESC가 "방별 최신 1건"을 고른다.
+		// → 방마다 LIMIT 1 쿼리를 N번 부르던 것을 쿼리 1방으로 대체.
+
+		const result = await this.db
+			.selectDistinctOn([messages.chatRoomId], {
 				...getTableColumns(messages),
 				sender: getTableColumns(users),
 			})
 			.from(messages)
 			.innerJoin(users, eq(users.id, messages.senderId))
 			.where(
-				and(eq(messages.chatRoomId, chatRoomId), eq(messages.isDeleted, false)),
+				and(
+					inArray(messages.chatRoomId, roomIds),
+					eq(messages.isDeleted, false),
+				),
 			)
-			.orderBy(desc(messages.sequenceNumber))
-			.limit(1);
+			.orderBy(messages.chatRoomId, desc(messages.sequenceNumber));
 
-		return message ?? null;
+		return new Map(result.map((m) => [m.chatRoomId, m]));
 	}
 
 	/**

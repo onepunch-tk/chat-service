@@ -9,8 +9,18 @@ import {
 	ilike,
 	sql,
 } from "@repo/db";
-import { chatRoomMembers, chatRooms, SelectChatRoom } from "@repo/db/schemas";
-import type { CreateChatRoomInput, CursorPageInput } from "@repo/shared-types";
+import {
+	ChatRoomWithRelations,
+	chatRoomMembers,
+	chatRooms,
+	SelectChatRoom,
+	users,
+} from "@repo/db/schemas";
+import type {
+	CreateChatRoomInput,
+	CursorPageInput,
+	SearchCursorPageInput,
+} from "@repo/shared-types";
 import { DRIZZLE } from "../database/database.constant";
 import { escapeLike } from "../database/like.util";
 import { ChatRoomMemberRepository } from "./chat-room-member.repository";
@@ -48,10 +58,26 @@ export class ChatRoomRepository {
 		});
 	}
 
+	async findChatRoomById(
+		roomId: number,
+	): Promise<ChatRoomWithRelations | null> {
+		const [chatRoom] = await this.db
+			.select({
+				...getTableColumns(chatRooms),
+				creator: getTableColumns(users),
+			})
+			.from(chatRooms)
+			.innerJoin(users, eq(users.id, chatRooms.createdBy))
+			.where(eq(chatRooms.id, roomId))
+			.limit(1);
+
+		return chatRoom ?? null;
+	}
+
 	async findChatRoomsByUserId(
 		userId: number,
 		{ cursor, limit }: CursorPageInput,
-	): Promise<SelectChatRoom[]> {
+	): Promise<ChatRoomWithRelations[]> {
 		const cursorRoom = alias(chatRooms, "cursor_room");
 		const cursorCondition = cursor
 			? sql`(${chatRooms.updatedAt}, ${chatRooms.id}) < (${this.db
@@ -61,8 +87,12 @@ export class ChatRoomRepository {
 			: undefined;
 
 		return this.db
-			.select(getTableColumns(chatRooms))
+			.select({
+				...getTableColumns(chatRooms),
+				creator: getTableColumns(users),
+			})
 			.from(chatRooms)
+			.innerJoin(users, eq(chatRooms.createdBy, users.id))
 			.innerJoin(chatRoomMembers, eq(chatRooms.id, chatRoomMembers.chatRoomId))
 			.where(
 				and(
@@ -76,24 +106,38 @@ export class ChatRoomRepository {
 			.orderBy(desc(chatRooms.updatedAt), desc(chatRooms.id));
 	}
 
-	async findActiveChatRooms(): Promise<SelectChatRoom[]> {
-		return this.db
-			.select()
-			.from(chatRooms)
-			.where(and(eq(chatRooms.isActive, true)))
-			.orderBy(desc(chatRooms.createdAt));
-	}
+	async searchActiveChatRoomsByName({
+		query,
+		cursor,
+		limit,
+	}: SearchCursorPageInput): Promise<ChatRoomWithRelations[]> {
+		const cursorRoom = alias(chatRooms, "cursor_room");
+		const cursorCondition = cursor
+			? sql`
+			(${chatRooms.createdAt},${chatRooms.id}) < (${this.db
+				.select({
+					createdAt: cursorRoom.createdAt,
+					id: cursorRoom.id,
+				})
+				.from(cursorRoom)
+				.where(eq(cursorRoom.id, cursor))})`
+			: undefined;
 
-	async searchActiveChatRoomsByName(name: string): Promise<SelectChatRoom[]> {
 		return this.db
-			.select()
+			.select({
+				...getTableColumns(chatRooms),
+				creator: getTableColumns(users),
+			})
 			.from(chatRooms)
+			.innerJoin(users, eq(chatRooms.createdBy, users.id))
 			.where(
 				and(
-					ilike(chatRooms.name, `%${escapeLike(name)}%`),
+					query ? ilike(chatRooms.name, `%${escapeLike(query)}%`) : undefined,
 					eq(chatRooms.isActive, true),
+					cursorCondition,
 				),
 			)
-			.orderBy(desc(chatRooms.createdAt));
+			.orderBy(desc(chatRooms.createdAt), desc(chatRooms.id))
+			.limit(limit);
 	}
 }

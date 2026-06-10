@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { OnEvent } from "@nestjs/event-emitter";
 import {
 	OnGatewayConnection,
@@ -12,10 +13,11 @@ import { type ChatDomainEvents, chatEvent } from "./chat.events";
 
 @WebSocketGateway({ transports: ["websocket"] })
 export class ChatGateway implements OnGatewayConnection {
+	private readonly logger = new Logger(ChatGateway.name);
 	@WebSocketServer() private readonly server: Server;
 
 	handleConnection(socket: Socket) {
-		throw new Error("Method not implemented.");
+		this.logger.debug(`connected: ${socket.id}`);
 	}
 
 	@SubscribeMessage(clientEvent("sendMessage"))

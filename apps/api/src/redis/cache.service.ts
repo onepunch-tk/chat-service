@@ -79,4 +79,36 @@ export class CacheService {
 		await this.set(namespace, key, value);
 		return value;
 	}
+
+	/**
+	 * getOrSet의 배치 버전 — loader를 키 하나가 아니라 미스난 키 묶음 단위로 호출해
+	 * DB N+1을 막는다. 반환은 입력 keys 순서를 보존한다. factory가 못 돌려준 키는
+	 * 결과에서 빠지며, getOrSet처럼 negative caching은 없다(null/undefined는 캐싱·반환 안 됨).
+	 */
+	async getOrSetMany<K extends string | number, T>(
+		namespace: CacheNamespace,
+		keys: K[],
+		factory: (missedKeys: K[]) => Promise<Map<number | string, T>>,
+	): Promise<T[]> {
+		// 키별 GET — Promise.all이 결과를 keys와 같은 인덱스에 정렬(auto-pipelined) RTT=1.
+		const cached = await Promise.all(
+			keys.map((k) => this.get<T>(namespace, k)),
+		);
+		// cached[i] === null인 위치의 키만 추려 미스 목록
+		const missedKeys = keys.filter((_, i) => cached[i] === null);
+		// 미스가 있을 때만 배치 계산 — factory는 "키 → 값" Map을 돌려준다(순서 무의미).
+		const computed =
+			missedKeys.length > 0 ? await factory(missedKeys) : new Map<K, T>();
+
+		if (computed.size > 0) {
+			await Promise.all(
+				[...computed].map(([k, v]) => this.set(namespace, k, v)),
+			);
+		}
+
+		// 순서는 keys가, 값 대응은 Map.get이 담당. 히트면 cached, 미스면 computed.
+		return keys
+			.map((k, i) => cached[i] ?? computed.get(k))
+			.filter((v): v is T => v != null);
+	}
 }

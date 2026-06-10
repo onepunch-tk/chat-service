@@ -10,6 +10,7 @@ import type {
 	SelectMessage,
 } from "@repo/db/schemas";
 import * as z from "zod";
+import { cursorPageSchema } from "./search.dto";
 import type { Serialized } from "./serialized";
 import type { UserDto } from "./user.dto";
 
@@ -74,12 +75,6 @@ export enum MessageDirection {
 	BEFORE = "BEFORE",
 	AFTER = "AFTER",
 }
-
-export const cursorPageSchema = z.object({
-	cursor: z.int().positive().nullish().default(null),
-	limit: z.int().min(1).max(100).default(50),
-});
-export type CursorPageInput = z.infer<typeof cursorPageSchema>;
 
 export const messagePageSchema = cursorPageSchema.extend({
 	chatRoomId: z.int({ error: "채팅방 ID는 필수입니다." }).positive(),

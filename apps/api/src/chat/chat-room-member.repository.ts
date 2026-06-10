@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, type DrizzleDB, eq, sql } from "@repo/db";
+import { and, count, type DrizzleDB, eq, inArray, sql } from "@repo/db";
 import { chatRoomMembers, type SelectChatRoomMembers } from "@repo/db/schemas";
 import { JoinMemberInput } from "@repo/shared-types";
 import { DRIZZLE } from "../database/database.constant";
@@ -47,14 +47,24 @@ export class ChatRoomMemberRepository {
 		return member ?? null;
 	}
 
-	async countActiveMembers(chatRoomId: number): Promise<number> {
-		return this.db.$count(
-			chatRoomMembers,
-			and(
-				eq(chatRoomMembers.chatRoomId, chatRoomId),
-				eq(chatRoomMembers.isActive, true),
-			),
-		);
+	async countActiveMembersByRoomIds(
+		roomIds: number[],
+	): Promise<Map<number, number>> {
+		const result = await this.db
+			.select({
+				chatRoomId: chatRoomMembers.chatRoomId,
+				count: count(),
+			})
+			.from(chatRoomMembers)
+			.where(
+				and(
+					inArray(chatRoomMembers.chatRoomId, roomIds),
+					eq(chatRoomMembers.isActive, true),
+				),
+			)
+			.groupBy(chatRoomMembers.chatRoomId);
+
+		return new Map(result.map(({ chatRoomId, count }) => [chatRoomId, count]));
 	}
 
 	async leave(chatRoomId: number, userId: number): Promise<boolean> {

@@ -42,6 +42,7 @@ export const chatRooms = pgTable(
 		index("idx_chat_room_type").on(t.type),
 		index("idx_chat_room_active").on(t.isActive),
 		index("idx_chat_room_updated_cursor").on(t.updatedAt, t.id),
+		index("idx_chat_room_created_cursor").on(t.createdAt, t.id),
 		index("idx_chat_room_name_tgram").using("gin", t.name.op("gin_trgm_ops")),
 	],
 );

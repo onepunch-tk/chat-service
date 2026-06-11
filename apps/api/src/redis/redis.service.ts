@@ -51,4 +51,76 @@ export class RedisService {
 
 		return deleted;
 	}
+
+	/**
+	 * LIST의 head(index 0)부터 count개를 조회해 역직렬화한다.
+	 *
+	 * @param namespace 캐시 네임스페이스
+	 * @param key LIST 키
+	 * @param count head부터 조회할 개수
+	 * @returns 역직렬화된 항목 배열 — 키가 없으면 빈 배열
+	 */
+	async lRange<T>(
+		namespace: CacheNamespace,
+		key: string | number,
+		count: number,
+	): Promise<T[]> {
+		const raw = await this.redisClient.lRange(
+			`${namespace}:${key}`,
+			0,
+			count - 1,
+		);
+		return raw.map((s) => JSON.parse(s) as T);
+	}
+
+	/**
+	 * LIST를 통째로 재구축한다 — DEL → RPUSH → EXPIRE를 MULTI 한 묶음으로 실행한다.
+	 * RPUSH는 입력 배열 순서를 보존하므로, head=최신을 원하면 호출부가 "최신 먼저"로
+	 * 정렬해 넘겨야 한다. LIST 생성은 이 메서드만 한다(lPushTrim은 LPUSHX라 생성 불가).
+	 *
+	 * @param namespace 캐시 네임스페이스
+	 * @param key LIST 키
+	 * @param values 저장할 값 배열 — head에 올 항목부터 순서대로
+	 */
+	async lRebuild<T>(
+		namespace: CacheNamespace,
+		key: string | number,
+		values: T[],
+	) {
+		const k = `${namespace}:${key}`;
+		await this.redisClient
+			.multi()
+			.del(k)
+			.rPush(
+				k,
+				values.map((v) => JSON.stringify(v)),
+			)
+			.expire(k, CACHE_TTL[namespace])
+			.exec();
+	}
+
+	/**
+	 * LIST head에 1건을 추가하고 max개로 절단한다 — LPUSHX → LTRIM → EXPIRE MULTI.
+	 * LPUSHX는 키가 없으면 no-op이다 — 부분 리스트 생성을 막아 "존재하는 리스트는
+	 * 완전하다" 불변식을 지킨다.
+	 *
+	 * @param namespace 캐시 네임스페이스
+	 * @param key LIST 키
+	 * @param value head에 추가할 값
+	 * @param max 유지할 최대 길이
+	 */
+	async lPushTrim<T>(
+		namespace: CacheNamespace,
+		key: string | number,
+		value: T,
+		max: number,
+	) {
+		const k = `${namespace}:${key}`;
+		await this.redisClient
+			.multi()
+			.lPushX(k, JSON.stringify(value))
+			.lTrim(k, 0, max - 1)
+			.expire(k, CACHE_TTL[namespace])
+			.exec();
+	}
 }

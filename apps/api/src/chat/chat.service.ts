@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+	ConflictException,
+	ForbiddenException,
+	Injectable,
+	NotFoundException,
+} from "@nestjs/common";
 import {
 	ChatRoomMemberWithMemberRelations,
 	ChatRoomWithRelations,
@@ -10,11 +15,15 @@ import {
 	ChatRoomMemberDto,
 	CreateChatRoomInput,
 	CursorPageInput,
+	MessageDirection,
 	MessageDto,
+	MessagePageInput,
 	SearchCursorPageInput,
+	SendMessageInput,
 	UserDto,
 } from "@repo/shared-types";
 import { CacheService } from "../redis/cache.service";
+import { RECENT_MESSAGES_MAX } from "../redis/redis.constant";
 import { UserRepository } from "../user/user.repository";
 import { ChatRoomRepository } from "./chat-room.repository";
 import { ChatRoomMemberRepository } from "./chat-room-member.repository";
@@ -22,11 +31,18 @@ import { MessageRepository } from "./message.repository";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
 /**
- * TODO(cache-invalidation): chatRooms:{id} 캐시는 memberCount/lastMessage 같은
- * "변동 필드"를 통째로 담으므로, 방 상태를 바꾸는 쓰기 경로에서 직접 무효화해야
- * 한다(아직 무효화 코드는 없음 — write 경로 활성화 전 필수):
- *   - sendMessage → cacheService.del("chatRooms", roomId)  // lastMessage 변경
- *   - join/leave  → cacheService.del("chatRooms", roomId)  // memberCount 변경
+ * 캐시 계약 — 네임스페이스별로 전략이 다르다:
+ * - chatRooms:{id}: memberCount/lastMessage 같은 변동 필드를 통째로 담는 read-through
+ *   blob. 방 상태를 바꾸는 쓰기 경로(join/leave/sendMessage)가 write-then-del로 직접
+ *   무효화한다.
+ * - chatRoomMembers:{roomId}: read-through 목록. join/leave가 del로 무효화한다.
+ * - messages:{roomId}: 최신 N개 LIST의 write-through(materialized view). sendMessage가
+ *   LPUSHX+LTRIM으로 직접 끌고 가므로 무효화가 없고, 리스트 생성은 getMessages의
+ *   rebuild 전용이다(부분 리스트 오염 차단 — docs/learn의 message-cache 설계 참고).
+ * - users:{id}: read-through 단건. presence 필드의 TTL 부적합 문제는 userToDto TODO 참고.
+ *
+ * 메시지 edit/delete 경로 구현 시: del("messages") 통째 무효화 + del("chatRooms")
+ * (lastMessage가 그 메시지였을 수 있다) 둘 다 필요하다.
  */
 @Injectable()
 export class ChatService {
@@ -138,11 +154,10 @@ export class ChatService {
 	private async memberToDto(
 		member: ChatRoomMemberWithMemberRelations,
 	): Promise<ChatRoomMemberDto> {
-		const { chatRoomId, userId, createdAt, ...rest } = member;
-
+		const { chatRoomId, userId, createdAt, user, ...rest } = member;
 		return {
 			...rest,
-			user: await this.userToDto(member.user),
+			user: await this.userToDto(user),
 			joinedAt: member.joinedAt.toISOString(),
 			leftAt: member.leftAt?.toISOString() ?? null,
 		};
@@ -162,6 +177,21 @@ export class ChatService {
 			throw new NotFoundException(`사용자를 찾을 수 없습니다: ${userId}`);
 
 		return user;
+	}
+
+	/**
+	 * 채팅방을 id로 조회한다.
+	 *
+	 * @param roomId 조회할 방 id
+	 * @returns 방 row (creator 관계 포함)
+	 * @throws NotFoundException 방이 없을 때
+	 */
+	private async findChatRoomById(roomId: number) {
+		const chatRoom = await this.chatRoomRepository.findChatRoomById(roomId);
+		if (!chatRoom)
+			throw new NotFoundException(`채팅방을 찾을 수 없습니다: ${roomId}`);
+
+		return chatRoom;
 	}
 
 	/**
@@ -187,8 +217,8 @@ export class ChatService {
 	}
 
 	/**
-	 * 채팅방을 생성하고 생성자를 OWNER로 가입시킨다. 성공 시 chatRoom.created
-	 * 이벤트를 발행한다.
+	 * 채팅방을 생성하고 생성자를 OWNER로 가입시킨다. 성공 시 chatRoom.memberJoined
+	 * 이벤트를 발행해 생성자의 활성 소켓을 방 채널에 합류시킨다.
 	 *
 	 * @param userId 생성자 유저 id
 	 * @param input 방 생성 입력(name, type 등)
@@ -202,8 +232,8 @@ export class ChatService {
 			input,
 		);
 
-		this.events.emit("chatRoom.created", {
-			creatorId: userId,
+		this.events.emit("chatRoom.memberJoined", {
+			userId,
 			roomId: chatRoom.id,
 		});
 
@@ -211,14 +241,20 @@ export class ChatService {
 	}
 
 	/**
-	 * 채팅방 1건을 조회한다. 존재 검증은 DB가 담당하고(캐시 히트여도 방 row 조회
-	 * 1회는 DB로 감), DTO 캐싱은 chatRoomToDto에 일임한다.
+	 * 채팅방 1건을 조회한다 — 캐시 우선(@Cacheable 시맨틱). 히트면 DB를 거치지
+	 * 않고, 미스에서만 방 row를 조회해 조립한다(캐시 채움은 chatRoomToDto 경유).
 	 *
 	 * @param roomId 조회할 방 id
 	 * @returns ChatRoomDto
-	 * @throws NotFoundException 방이 없을 때
+	 * @throws NotFoundException 방이 없을 때 (캐시 미스 경로에서만 검증됨)
 	 */
 	async getChatRoom(roomId: number): Promise<ChatRoomDto> {
+		const cached = await this.cacheService.get<ChatRoomDto>(
+			"chatRooms",
+			roomId,
+		);
+		if (cached) return cached;
+
 		const chatRoom = await this.chatRoomRepository.findChatRoomById(roomId);
 		if (!chatRoom)
 			throw new NotFoundException(`채팅방을 찾을 수 없습니다: ${roomId}`);
@@ -252,5 +288,194 @@ export class ChatService {
 		const chatRooms =
 			await this.chatRoomRepository.searchActiveChatRoomsByName(input);
 		return this.chatRoomsToDtos(chatRooms);
+	}
+
+	/**
+	 * 채팅방에 MEMBER로 가입한다 — 재가입은 upsert가 기존 행을 재활성화한다.
+	 * 성공 시 관련 캐시를 무효화(write-then-del)하고 chatRoom.memberJoined 이벤트를
+	 * 발행해 가입자의 활성 소켓을 방 채널에 합류시킨다.
+	 *
+	 * @param userId 가입할 유저 id
+	 * @param chatRoomId 대상 방 id
+	 * @throws NotFoundException 유저 또는 방이 없을 때
+	 * @throws ConflictException 이미 참여 중일 때
+	 */
+	async joinChatRoom(userId: number, chatRoomId: number) {
+		const [user, chatRoom] = await Promise.all([
+			this.findUserById(userId),
+			this.findChatRoomById(chatRoomId),
+		]);
+
+		const alreadyJoined =
+			await this.chatRoomMemberRepository.existsActiveMember({
+				userId: user.id,
+				chatRoomId: chatRoom.id,
+			});
+		if (alreadyJoined) throw new ConflictException("이미 참여한 채팅방입니다.");
+
+		await this.chatRoomMemberRepository.joinMember({
+			chatRoomId: chatRoom.id,
+			userId: user.id,
+			role: "MEMBER",
+		});
+
+		//write-then-del
+		await Promise.all([
+			this.cacheService.del("chatRoomMembers", chatRoomId),
+			this.cacheService.del("chatRooms", chatRoomId),
+		]);
+
+		this.events.emit("chatRoom.memberJoined", {
+			userId,
+			roomId: chatRoom.id,
+		});
+	}
+
+	/**
+	 * 채팅방에서 탈퇴한다 — soft-delete(isActive=false, 행 유지).
+	 * 성공 시 관련 캐시를 무효화(write-then-del)하고 chatRoom.memberLeft 이벤트를
+	 * 발행해 탈퇴자의 소켓을 방 채널에서 제거한다.
+	 *
+	 * @param userId 탈퇴할 유저 id
+	 * @param chatRoomId 대상 방 id
+	 * @throws ConflictException 참여 중인 멤버가 아닐 때
+	 */
+	async leaveChatRoom(userId: number, chatRoomId: number) {
+		const left = await this.chatRoomMemberRepository.leave({
+			userId,
+			chatRoomId,
+		});
+		if (!left) throw new ConflictException("참여하지 않은 채팅방입니다.");
+
+		//write-then-del
+		await Promise.all([
+			this.cacheService.del("chatRoomMembers", chatRoomId),
+			this.cacheService.del("chatRooms", chatRoomId),
+		]);
+
+		this.events.emit("chatRoom.memberLeft", {
+			userId,
+			roomId: chatRoomId,
+		});
+	}
+
+	/**
+	 * 방의 활성 멤버 목록을 가입순으로 조회한다 — chatRoomMembers:{roomId}에 캐싱.
+	 * 방 존재 검증이 factory 안에 있어 없는 방은 throw되고 캐싱되지 않는다.
+	 *
+	 * @param chatRoomId 대상 방 id
+	 * @returns ChatRoomMemberDto 배열 (joinedAt 오름차순)
+	 * @throws NotFoundException 방이 없을 때 (캐시 미스 경로에서만 검증됨)
+	 */
+	async getChatRoomMembers(chatRoomId: number): Promise<ChatRoomMemberDto[]> {
+		return this.cacheService.getOrSet<ChatRoomMemberDto[]>(
+			"chatRoomMembers",
+			chatRoomId,
+			async () => {
+				await this.findChatRoomById(chatRoomId);
+				const members =
+					await this.chatRoomMemberRepository.findActiveMembers(chatRoomId);
+
+				return Promise.all(members.map((m) => this.memberToDto(m)));
+			},
+		);
+	}
+
+	/**
+	 * 방 메시지를 sequenceNumber 커서 페이지로 조회한다. 삭제된 메시지는 content=null
+	 * tombstone으로 포함된다(seq 연속성 유지 — 클라 gap 감지가 구멍으로 오인하지 않게).
+	 *
+	 * 첫 페이지 요청(cursor 없음 + BEFORE + limit ≤ RECENT_MESSAGES_MAX)만
+	 * messages:{roomId} LIST 캐시로 서빙한다. 미스면 최신 RECENT_MESSAGES_MAX개로
+	 * rebuild해 캐시를 꽉 채우고 응답은 limit만큼 자른다 — "존재하는 리스트는
+	 * 완전하다" 불변식 유지. 그 외 요청(과거 페이지·AFTER)은 DB로 간다.
+	 *
+	 * @param userId 요청 유저 id (멤버십 검증용)
+	 * @param input 페이지 입력(chatRoomId, cursor: seq, direction, limit)
+	 * @returns MessageDto 배열 — BEFORE는 seq 내림차순, AFTER는 오름차순
+	 * @throws ForbiddenException 방의 활성 멤버가 아닐 때
+	 */
+	async getMessages(
+		userId: number,
+		input: MessagePageInput,
+	): Promise<MessageDto[]> {
+		const joined = await this.chatRoomMemberRepository.existsActiveMember({
+			userId,
+			chatRoomId: input.chatRoomId,
+		});
+		if (!joined) throw new ForbiddenException("채팅방 멤버가 아닙니다.");
+
+		const cacheable =
+			input.cursor === null &&
+			input.direction === MessageDirection.BEFORE &&
+			input.limit <= RECENT_MESSAGES_MAX;
+
+		if (cacheable) {
+			const cached = await this.cacheService.listRange<MessageDto>(
+				"messages",
+				input.chatRoomId,
+				input.limit,
+			);
+			if (cached) return cached;
+		}
+
+		const rows = await this.messageRepository.findByChatRoomId(
+			cacheable ? { ...input, limit: RECENT_MESSAGES_MAX } : input,
+		);
+		const dtos = await Promise.all(rows.map((m) => this.messageToDto(m)));
+
+		if (cacheable) {
+			await this.cacheService.listRebuild("messages", input.chatRoomId, dtos);
+			return dtos.slice(0, input.limit);
+		}
+		return dtos;
+	}
+
+	/**
+	 * 메시지를 전송한다 — DB 채번+INSERT 후 messages:{roomId} LIST 캐시를
+	 * write-through(LPUSHX+LTRIM)로 갱신하고, lastMessage가 바뀌므로 chatRooms:{roomId}
+	 * blob을 무효화한다. 성공 시 message.sent 이벤트를 발행해 게이트웨이가 방 채널로
+	 * 브로드캐스트한다.
+	 *
+	 * @param senderId 발신 유저 id
+	 * @param input 전송 입력(chatRoomId, content 등)
+	 * @returns 확정된 MessageDto(sequenceNumber 포함) — 게이트웨이가 ack로 내려보낸다
+	 * @throws NotFoundException 방 또는 유저가 없을 때
+	 * @throws ForbiddenException 방의 활성 멤버가 아닐 때
+	 */
+	async sendMessage(
+		senderId: number,
+		input: SendMessageInput,
+	): Promise<MessageDto> {
+		const [_chatRoom, sender, joined] = await Promise.all([
+			this.findChatRoomById(input.chatRoomId),
+			this.findUserById(senderId),
+			this.chatRoomMemberRepository.existsActiveMember({
+				userId: senderId,
+				chatRoomId: input.chatRoomId,
+			}),
+		]);
+
+		if (!joined) throw new ForbiddenException("채팅방 멤버가 아닙니다.");
+
+		const row = await this.messageRepository.createInRoom(senderId, input);
+		const messageDto = await this.messageToDto({ ...row, sender });
+
+		await Promise.all([
+			this.cacheService.listPushTrim<MessageDto>(
+				"messages",
+				input.chatRoomId,
+				messageDto,
+				RECENT_MESSAGES_MAX,
+			),
+			this.cacheService.del("chatRooms", input.chatRoomId),
+		]);
+
+		this.events.emit("message.sent", {
+			roomId: input.chatRoomId,
+			message: messageDto,
+		});
+
+		return messageDto;
 	}
 }

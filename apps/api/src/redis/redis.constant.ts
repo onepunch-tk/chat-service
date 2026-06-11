@@ -12,3 +12,5 @@ export const CACHE_TTL = {
 } as const satisfies Record<string, number>;
 
 export type CacheNamespace = keyof typeof CACHE_TTL & string;
+
+export const RECENT_MESSAGES_MAX = 50;

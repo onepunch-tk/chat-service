@@ -1,8 +1,24 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, count, type DrizzleDB, eq, inArray, sql } from "@repo/db";
-import { chatRoomMembers, type SelectChatRoomMembers } from "@repo/db/schemas";
+import {
+	and,
+	count,
+	type DrizzleDB,
+	eq,
+	getTableColumns,
+	inArray,
+	sql,
+} from "@repo/db";
+import {
+	ChatRoomMemberWithMemberRelations,
+	chatRoomMembers,
+	type SelectChatRoomMembers,
+	users,
+} from "@repo/db/schemas";
 import { JoinMemberInput } from "@repo/shared-types";
 import { DRIZZLE } from "../database/database.constant";
+
+/** 멤버십 식별 복합키 — number 위치 인자 둘은 스왑이 컴파일에 안 잡히므로 객체로 고정한다. */
+export type ChatRoomMemberKey = Pick<JoinMemberInput, "chatRoomId" | "userId">;
 
 @Injectable()
 export class ChatRoomMemberRepository {
@@ -12,27 +28,43 @@ export class ChatRoomMemberRepository {
 		joinMember: JoinMemberInput,
 		db: DrizzleDB = this.db,
 	): Promise<void> {
-		await db.insert(chatRoomMembers).values(joinMember);
+		await db
+			.insert(chatRoomMembers)
+			.values(joinMember)
+			.onConflictDoUpdate({
+				target: [chatRoomMembers.chatRoomId, chatRoomMembers.userId],
+				set: {
+					isActive: true,
+					leftAt: null,
+					joinedAt: sql`now()`,
+					role: joinMember.role,
+				},
+			});
 	}
 
 	async findActiveMembers(
 		chatRoomId: number,
-	): Promise<SelectChatRoomMembers[]> {
+	): Promise<ChatRoomMemberWithMemberRelations[]> {
 		return this.db
-			.select()
+			.select({
+				...getTableColumns(chatRoomMembers),
+				user: getTableColumns(users),
+			})
 			.from(chatRoomMembers)
+			.innerJoin(users, eq(users.id, chatRoomMembers.userId))
 			.where(
 				and(
 					eq(chatRoomMembers.chatRoomId, chatRoomId),
 					eq(chatRoomMembers.isActive, true),
 				),
-			);
+			)
+			.orderBy(chatRoomMembers.joinedAt);
 	}
 
-	async findActiveMember(
-		chatRoomId: number,
-		userId: number,
-	): Promise<SelectChatRoomMembers | null> {
+	async findActiveMember({
+		chatRoomId,
+		userId,
+	}: ChatRoomMemberKey): Promise<SelectChatRoomMembers | null> {
 		const [member] = await this.db
 			.select()
 			.from(chatRoomMembers)
@@ -67,7 +99,7 @@ export class ChatRoomMemberRepository {
 		return new Map(result.map(({ chatRoomId, count }) => [chatRoomId, count]));
 	}
 
-	async leave(chatRoomId: number, userId: number): Promise<boolean> {
+	async leave({ chatRoomId, userId }: ChatRoomMemberKey): Promise<boolean> {
 		const result = await this.db
 			.update(chatRoomMembers)
 			.set({
@@ -85,10 +117,10 @@ export class ChatRoomMemberRepository {
 		return (result.rowCount ?? 0) > 0;
 	}
 
-	async existsActiveMember(
-		chatRoomId: number,
-		userId: number,
-	): Promise<boolean> {
+	async existsActiveMember({
+		chatRoomId,
+		userId,
+	}: ChatRoomMemberKey): Promise<boolean> {
 		const [member] = await this.db
 			.select({ one: sql`1` })
 			.from(chatRoomMembers)

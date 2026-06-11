@@ -6,6 +6,7 @@ import {
 	desc,
 	eq,
 	getTableColumns,
+	gt,
 	gte,
 	inArray,
 	lt,
@@ -14,13 +15,16 @@ import {
 } from "@repo/db";
 import {
 	chatRooms,
-	MessageWithAllRelations,
 	MessageWithSenderRelations,
 	messages,
 	SelectMessage,
 	users,
 } from "@repo/db/schemas";
-import type { CursorPageInput, SendMessageInput } from "@repo/shared-types";
+import {
+	MessageDirection,
+	type MessagePageInput,
+	type SendMessageInput,
+} from "@repo/shared-types";
 import { DRIZZLE } from "../database/database.constant";
 
 @Injectable()
@@ -31,28 +35,33 @@ export class MessageRepository {
 
 	constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
 
-	async findByChatRoomId(
-		chatRoomId: number,
-		{ cursor, limit }: CursorPageInput,
-	): Promise<MessageWithAllRelations[]> {
+	async findByChatRoomId({
+		chatRoomId,
+		cursor,
+		limit,
+		direction,
+	}: MessagePageInput): Promise<MessageWithSenderRelations[]> {
+		const cursorCondition = cursor
+			? direction === MessageDirection.BEFORE
+				? lt(messages.sequenceNumber, cursor)
+				: gt(messages.sequenceNumber, cursor)
+			: undefined;
+
 		return this.db
 			.select({
 				...getTableColumns(messages),
 				content: this.redactedContent,
-				chatRoom: getTableColumns(chatRooms),
 				sender: getTableColumns(users),
 			})
 			.from(messages)
-			.innerJoin(chatRooms, eq(chatRooms.id, messages.chatRoomId))
 			.innerJoin(users, eq(users.id, messages.senderId))
-			.where(
-				and(
-					eq(messages.chatRoomId, chatRoomId),
-					cursor ? lt(messages.sequenceNumber, cursor) : undefined,
-				),
-			)
+			.where(and(eq(messages.chatRoomId, chatRoomId), cursorCondition))
 			.limit(limit)
-			.orderBy(desc(messages.sequenceNumber));
+			.orderBy(
+				direction === MessageDirection.BEFORE
+					? desc(messages.sequenceNumber)
+					: asc(messages.sequenceNumber),
+			);
 	}
 
 	async findLatestMessagesByRoomIds(
@@ -82,14 +91,18 @@ export class MessageRepository {
 	}
 
 	/**
-	 * seq + save
+	 * 방 시퀀스를 채번하고 메시지를 저장한다 — lastSeq UPDATE의 행 락이 같은 방의
+	 * 동시 전송을 직렬화해 연속 시퀀스(방식 B)를 보장한다.
+	 *
+	 * @param userId 발신 유저 id
+	 * @param newMessage 전송 입력(chatRoomId, type, content)
+	 * @returns 삽입된 메시지 row — sender 관계는 호출부가 합성한다
 	 */
 	async createInRoom(
 		userId: number,
 		newMessage: SendMessageInput,
 	): Promise<SelectMessage> {
 		return this.db.transaction(async (tx) => {
-			// room lastSeq 업데이트
 			const [room] = await tx
 				.update(chatRooms)
 				.set({ lastSeq: sql`${chatRooms.lastSeq} + 1` })

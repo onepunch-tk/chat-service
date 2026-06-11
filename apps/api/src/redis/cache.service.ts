@@ -111,4 +111,81 @@ export class CacheService {
 			.map((k, i) => cached[i] ?? computed.get(k))
 			.filter((v): v is T => v != null);
 	}
+
+	/**
+	 * LIST 캐시의 head부터 count개를 조회한다 (fail-open).
+	 * 히트 판정은 "키 존재"다 — 존재하는 리스트는 listRebuild가 완전하게 채운 것이므로
+	 * count보다 짧은 결과도 그대로 신뢰한다.
+	 *
+	 * @param namespace 캐시 네임스페이스
+	 * @param key LIST 키
+	 * @param count head부터 조회할 개수
+	 * @returns 히트면 항목 배열, 키 없음·Redis 에러는 null(miss)
+	 */
+	async listRange<T>(
+		namespace: CacheNamespace,
+		key: string | number,
+		count: number,
+	): Promise<T[] | null> {
+		try {
+			// await 필수 — promise를 그대로 return하면 rejection이 catch를 건너뛴다.
+			const values = await this.redisService.lRange<T>(namespace, key, count);
+			// 빈 배열 = 키 없음 = miss. (LPUSHX 불변식상 실존 리스트는 비어 있을 수 없다)
+			return values.length > 0 ? values : null;
+		} catch (error) {
+			// 읽기 실패는 miss로 강등 → 호출부가 DB로 재계산한다.
+			this.logger.warn(`cache listRange failed (${namespace}:${key})`, error);
+			return null;
+		}
+	}
+
+	/**
+	 * LIST 캐시를 통째로 재구축한다 (fail-open — 실패는 무시).
+	 * 빈 배열이면 리스트를 만들지 않는다 — 빈 결과는 항상 DB로 재확인한다.
+	 *
+	 * @param namespace 캐시 네임스페이스
+	 * @param key LIST 키
+	 * @param values 저장할 값 배열 — head에 올 항목(최신)부터 순서대로
+	 */
+	async listRebuild<T>(
+		namespace: CacheNamespace,
+		key: string | number,
+		values: T[],
+	): Promise<void> {
+		// 빈 목록은 리스트를 만들지 않는다
+		if (values.length === 0) return;
+
+		try {
+			await this.redisService.lRebuild<T>(namespace, key, values);
+		} catch (error) {
+			// 쓰기 실패는 무시 — 이미 계산된 값은 그대로 반환된다.
+			this.logger.warn(`cache listRebuild failed (${namespace}:${key})`, error);
+		}
+	}
+
+	/**
+	 * LIST 캐시 head에 1건을 추가하고 max개를 유지한다 (fail-open — 실패는 무시).
+	 * 키가 없으면 no-op(LPUSHX) — 리스트 생성은 listRebuild 전용이다.
+	 *
+	 * @param namespace 캐시 네임스페이스
+	 * @param key LIST 키
+	 * @param value head에 추가할 값
+	 * @param max 유지할 최대 길이
+	 */
+	async listPushTrim<T>(
+		namespace: CacheNamespace,
+		key: string | number,
+		value: T,
+		max: number,
+	): Promise<void> {
+		try {
+			await this.redisService.lPushTrim<T>(namespace, key, value, max);
+		} catch (error) {
+			// 쓰기 실패는 무시 — 다음 rebuild/TTL이 치유한다.
+			this.logger.warn(
+				`cache listPushTrim failed (${namespace}:${key})`,
+				error,
+			);
+		}
+	}
 }

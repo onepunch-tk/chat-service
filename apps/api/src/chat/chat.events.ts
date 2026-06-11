@@ -1,3 +1,5 @@
+import { MessageDto } from "@repo/shared-types";
+
 /**
  * 내부 도메인 이벤트(Nest EventEmitter2) 계약.
  *
@@ -6,8 +8,9 @@
  * 소스로 참조해 이벤트 이름·payload가 함께 강제되도록 한다.
  */
 export interface ChatDomainEvents {
-	"chatRoom.created": { creatorId: number; roomId: number };
+	"chatRoom.memberJoined": { userId: number; roomId: number };
 	"chatRoom.memberLeft": { userId: number; roomId: number };
+	"message.sent": { roomId: number; message: MessageDto };
 }
 
 /**

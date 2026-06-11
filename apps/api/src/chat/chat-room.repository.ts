@@ -68,7 +68,7 @@ export class ChatRoomRepository {
 			})
 			.from(chatRooms)
 			.innerJoin(users, eq(users.id, chatRooms.createdBy))
-			.where(eq(chatRooms.id, roomId))
+			.where(and(eq(chatRooms.id, roomId), eq(chatRooms.isActive, true)))
 			.limit(1);
 
 		return chatRoom ?? null;

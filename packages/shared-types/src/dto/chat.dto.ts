@@ -67,7 +67,7 @@ export const sendMessageSchema = z.object({
 	type: z.enum(MESSAGE_TYPES, {
 		error: "메시지 타입은 필수입니다.",
 	}),
-	content: z.string().nullish(),
+	content: z.string({ error: "채팅 메시지는 필수입니다." }),
 }) satisfies z.ZodType<Pick<InsertMessage, "chatRoomId" | "type" | "content">>;
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 

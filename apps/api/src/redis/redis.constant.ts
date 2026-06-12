@@ -13,4 +13,7 @@ export const CACHE_TTL = {
 
 export type CacheNamespace = keyof typeof CACHE_TTL & string;
 
+const REDIS_SESSION_KEY = "redisSession" satisfies CacheNamespace;
+export const REDIS_SESSION_PREFIX = `${REDIS_SESSION_KEY}:` as const;
+
 export const RECENT_MESSAGES_MAX = 50;

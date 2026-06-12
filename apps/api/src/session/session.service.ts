@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Request } from "express";
+import { TypedEventEmitter } from "../events/typed-event-emitter";
 import { RedisService } from "../redis/redis.service";
 
 /**
@@ -11,7 +12,10 @@ import { RedisService } from "../redis/redis.service";
  */
 @Injectable()
 export class SessionService {
-	constructor(private readonly redisService: RedisService) {}
+	constructor(
+		private readonly redisService: RedisService,
+		private readonly events: TypedEventEmitter,
+	) {}
 
 	private readonly logger = new Logger(SessionService.name);
 
@@ -44,14 +48,18 @@ export class SessionService {
 	 */
 	async terminate(req: Request) {
 		const userId = req.session.userId;
-		if (userId) await this.redisService.del("userSession", userId);
+		const sessionId = req.session.id;
+		if (userId) {
+			await this.redisService.del("userSession", userId);
+		}
 
 		await this.destroy(req);
+		this.events.emit("session.terminated", { sessionId });
 	}
 
 	/**
 	 * 세션을 sessionId로 재검증하고, 유효하면 수명을 연장(rolling)한다.
-	 * WS 메시지마다 가드(UC-5)에서 호출하는 것을 의도한다 —
+	 * WS 메시지마다 호출하는 것을 의도한다 —
 	 * 핸드셰이크 시점의 스냅샷이 아니라 매번 저장소를 재조회하므로 만료·로그아웃을 잡아낸다.
 	 *
 	 * @param sessionId 검증·연장할 세션 ID
@@ -82,8 +90,10 @@ export class SessionService {
 	 */
 	private async kickExistingSession(userId: number): Promise<void> {
 		const oldId = await this.redisService.get<string>("userSession", userId);
+		if (!oldId) return;
 
-		if (oldId) await this.redisService.del("redisSession", oldId);
+		await this.redisService.del("redisSession", oldId);
+		this.events.emit("session.terminated", { sessionId: oldId });
 	}
 
 	/**

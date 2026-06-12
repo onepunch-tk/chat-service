@@ -11,12 +11,13 @@ export interface WsErrorMessage {
 /** 서버 -> 클라이언트 이벤트 타입*/
 export interface ServerToClientEvents {
 	chatMessage: (message: MessageDto) => void;
-	error: (error: WsErrorMessage) => void;
+	exception: (error: WsErrorMessage) => void;
 }
 
 /** 클라이언트 -> 서버 이벤트 타입 */
 export interface ClientToServerEvents {
 	sendMessage: (input: SendMessageInput) => void;
+	heartBeat: () => string;
 }
 
 export const clientEvent = <K extends keyof ClientToServerEvents>(key: K) =>

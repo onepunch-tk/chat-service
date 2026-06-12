@@ -1,16 +1,18 @@
 import { Module } from "@nestjs/common";
+import { EventsModule } from "../events/events.module";
 import { RedisModule } from "../redis/redis.module";
 import { SessionService } from "./session.service";
+import { WsSessionGuard } from "./ws-session.guard";
 
 /**
  * 세션 인증(로그인/로그아웃·단일 활성 세션·rolling TTL·WS 가드) 단위.
  *
- * 이전엔 AppModule providers에 SessionService가 떠 있었으나, 모듈로 묶어 RedisModule
- * 의존을 명시하고 SessionService를 import 가능한 단위로 export한다. 로그인 컨트롤러나
- * WS 가드(UC-5)가 생기면 이 모듈을 import해서 주입받는다.
+ * SessionService는 로그인 컨트롤러가, WsSessionGuard는 WsModule의 게이트웨이가
+ * 주입받도록 export한다. session.terminated 발행은 EventsModule의
+ * TypedEventEmitter로 한다.
  */
 @Module({
-	imports: [RedisModule],
+	imports: [RedisModule, EventsModule],
 	providers: [SessionService],
 	exports: [SessionService],
 })

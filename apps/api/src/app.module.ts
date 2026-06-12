@@ -8,6 +8,7 @@ import { DatabaseModule } from "./database/database.module";
 import { RedisModule } from "./redis/redis.module";
 import { SessionModule } from "./session/session.module";
 import { UserModule } from "./user/user.module";
+import { WsModule } from "./websocket/ws.module";
 
 @Module({
 	imports: [
@@ -18,6 +19,7 @@ import { UserModule } from "./user/user.module";
 		UserModule,
 		ChatModule,
 		SessionModule,
+		WsModule,
 	],
 	controllers: [],
 	providers: [{ provide: APP_PIPE, useClass: ZodValidationPipe }],

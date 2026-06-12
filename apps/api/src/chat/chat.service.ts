@@ -22,13 +22,13 @@ import {
 	SendMessageInput,
 	UserDto,
 } from "@repo/shared-types";
+import { TypedEventEmitter } from "../events/typed-event-emitter";
 import { CacheService } from "../redis/cache.service";
 import { RECENT_MESSAGES_MAX } from "../redis/redis.constant";
 import { UserRepository } from "../user/user.repository";
 import { ChatRoomRepository } from "./chat-room.repository";
 import { ChatRoomMemberRepository } from "./chat-room-member.repository";
 import { MessageRepository } from "./message.repository";
-import { TypedEventEmitter } from "./typed-event-emitter";
 
 /**
  * 캐시 계약 — 네임스페이스별로 전략이 다르다:
@@ -379,6 +379,17 @@ export class ChatService {
 				return Promise.all(members.map((m) => this.memberToDto(m)));
 			},
 		);
+	}
+
+	/**
+	 * 유저가 가입한 활성 방 id 목록을 조회한다 — 연결 시 eager bulk-join용(정책 B).
+	 * 방·멤버십 모두 isActive=true인 것만 포함한다(탈퇴 방 재구독 차단).
+	 *
+	 * @param userId 조회 대상 유저 id
+	 * @returns 활성 방 id 목록 ({ id } 배열)
+	 */
+	async getActiveRoomIds(userId: number) {
+		return this.chatRoomRepository.findActiveRoomsIdByUserId(userId);
 	}
 
 	/**

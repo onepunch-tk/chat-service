@@ -140,4 +140,20 @@ export class ChatRoomRepository {
 			.orderBy(desc(chatRooms.createdAt), desc(chatRooms.id))
 			.limit(limit);
 	}
+
+	async findActiveRoomsIdByUserId(userId: number) {
+		return this.db
+			.select({
+				id: chatRooms.id,
+			})
+			.from(chatRooms)
+			.innerJoin(chatRoomMembers, eq(chatRoomMembers.chatRoomId, chatRooms.id))
+			.where(
+				and(
+					eq(chatRooms.isActive, true),
+					eq(chatRoomMembers.userId, userId),
+					eq(chatRoomMembers.isActive, true),
+				),
+			);
+	}
 }

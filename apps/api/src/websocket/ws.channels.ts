@@ -11,3 +11,5 @@
  */
 export const userChannel = (userId: number) => `user:${userId}` as const;
 export const roomChannel = (roomId: number) => `room:${roomId}` as const;
+export const sessionChannel = (sessionId: string) =>
+	`session:${sessionId}` as const;

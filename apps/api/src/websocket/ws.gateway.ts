@@ -41,12 +41,7 @@ export class WsGateway implements OnGatewayConnection {
 	constructor(private readonly chatService: ChatService) {}
 
 	/**
-	 * 신규 소켓 연결을 인증하고 라우팅 채널을 구축한다. 가드·예외 필터는
-	 * `@SubscribeMessage` 핸들러에만 적용되므로 연결 시점 인증은 여기서 수동으로
-	 * 한다(세션인증 UC-1). 인증 후 user(REST→WS 브리지 타깃)·session(로그아웃
-	 * disconnect 타깃) 채널에 join하고, 활성 방 전체에 bulk-join한다(정책 B, UC-3).
-	 *
-	 * bulk-join 조회 실패 시 연결은 유지하고 방 join 0으로 둔다(UC-3 최소 보장).
+	 * 신규 소켓 연결을 인증하고 라우팅 채널을 구축한다.
 	 *
 	 * @param socket 연결된 소켓 (핸드셰이크 미들웨어가 request.session을 주입함)
 	 */
@@ -134,8 +129,7 @@ export class WsGateway implements OnGatewayConnection {
 
 	/**
 	 * 방 채널 전원에게 chatMessage 이벤트를 송신한다 — server.to라 발신자 소켓도
-	 * 포함된다(멀티탭 동기화·단일 진실 경로 의도, docs/learn의
-	 * socketio-broadcast-ack-optimistic-ui-정합 참고).
+	 * 포함된다.
 	 *
 	 * @param roomId 대상 방 id
 	 * @param message 브로드캐스트할 확정 MessageDto

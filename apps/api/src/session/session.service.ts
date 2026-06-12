@@ -25,7 +25,7 @@ export class SessionService {
 	 * 1. 같은 사용자의 이전 세션을 강제 종료한다(중복 로그인 방지).
 	 * 2. 세션 ID를 재발급한다(세션 고정 공격 방지).
 	 * 3. 세션에 `userId`를 바인딩한다.
-	 * 4. `userId → 현재 sessionId` 매핑을 Redis에 저장한다.
+	 * 4. `userId → 현재 sessionId` 매핑을 Redis에 저장한다(영속 — 로그아웃 시 삭제, 재로그인 시 덮어씀).
 	 *
 	 * @param req 현재 요청(express-session 세션 포함)
 	 * @param userId 로그인한 사용자 ID
@@ -61,6 +61,7 @@ export class SessionService {
 	 * 세션을 sessionId로 재검증하고, 유효하면 수명을 연장(rolling)한다.
 	 * WS 메시지마다 호출하는 것을 의도한다 —
 	 * 핸드셰이크 시점의 스냅샷이 아니라 매번 저장소를 재조회하므로 만료·로그아웃을 잡아낸다.
+	 * HTTP에서는 express-session(rolling) + connect-redis의 touch가 같은 연장을 수행한다.
 	 *
 	 * @param sessionId 검증·연장할 세션 ID
 	 * @returns 세션이 살아 있으면 `"VALID"`, 없으면(만료/로그아웃) `"INVALID"`
@@ -74,10 +75,8 @@ export class SessionService {
 
 		if (!session?.userId) return "INVALID";
 
-		// 세션 본체와 역방향 인덱스의 TTL을 같은 시점에 함께 리셋(rolling).
-		// 한쪽만 밀면 인덱스가 먼저 만료돼 단일 세션 kick이 헛도므로 반드시 한 묶음으로.
-		await this.redisService.expire("redisSession", sessionId); // 본체 TTL만 연장(값 보존)
-		await this.redisService.set("userSession", session.userId, sessionId); // 인덱스도 갱신
+		// 본체 TTL만 연장(값 보존). userSession 인덱스는 영속이라 함께 밀 필요 없다.
+		await this.redisService.expire("redisSession", sessionId);
 
 		return "VALID";
 	}
@@ -85,6 +84,7 @@ export class SessionService {
 	/**
 	 * 같은 사용자의 이전 활성 세션을 세션 저장소에서 제거한다.
 	 * 한 사용자가 동시에 여러 세션을 갖지 못하도록(단일 활성 세션) 강제한다.
+	 * 인덱스가 영속이라 본체가 이미 만료된 stale 포인터일 수 있다 — 그 경우 del은 no-op이라 무해하다.
 	 *
 	 * @param userId 대상 사용자 ID
 	 */

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import type { CacheNamespace } from "./redis.constant";
+import type { CacheNamespace, ExpiringNamespace } from "./redis.constant";
 import { RedisService } from "./redis.service";
 
 /**
@@ -148,7 +148,7 @@ export class CacheService {
 	 * @param values 저장할 값 배열 — head에 올 항목(최신)부터 순서대로
 	 */
 	async listRebuild<T>(
-		namespace: CacheNamespace,
+		namespace: ExpiringNamespace,
 		key: string | number,
 		values: T[],
 	): Promise<void> {
@@ -173,7 +173,7 @@ export class CacheService {
 	 * @param max 유지할 최대 길이
 	 */
 	async listPushTrim<T>(
-		namespace: CacheNamespace,
+		namespace: ExpiringNamespace,
 		key: string | number,
 		value: T,
 		max: number,

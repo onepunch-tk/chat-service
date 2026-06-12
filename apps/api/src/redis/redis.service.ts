@@ -1,6 +1,11 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { RedisClientType } from "redis";
-import { CACHE_TTL, type CacheNamespace, REDIS_CLIENT } from "./redis.constant";
+import {
+	CACHE_TTL,
+	type CacheNamespace,
+	type ExpiringNamespace,
+	REDIS_CLIENT,
+} from "./redis.constant";
 
 @Injectable()
 export class RedisService {
@@ -9,9 +14,12 @@ export class RedisService {
 	) {}
 
 	async set(namespace: CacheNamespace, key: string | number, value: unknown) {
-		await this.redisClient.set(`${namespace}:${key}`, JSON.stringify(value), {
-			expiration: { type: "EX", value: CACHE_TTL[namespace] },
-		});
+		const ttl = CACHE_TTL[namespace];
+		await this.redisClient.set(
+			`${namespace}:${key}`,
+			JSON.stringify(value),
+			ttl === null ? {} : { expiration: { type: "EX", value: ttl } },
+		);
 	}
 
 	/**
@@ -32,7 +40,7 @@ export class RedisService {
 		return this.redisClient.del(`${namespace}:${key}`);
 	}
 
-	async expire(namespace: CacheNamespace, key: string | number) {
+	async expire(namespace: ExpiringNamespace, key: string | number) {
 		await this.redisClient.expire(`${namespace}:${key}`, CACHE_TTL[namespace]);
 	}
 
@@ -83,7 +91,7 @@ export class RedisService {
 	 * @param values 저장할 값 배열 — head에 올 항목부터 순서대로
 	 */
 	async lRebuild<T>(
-		namespace: CacheNamespace,
+		namespace: ExpiringNamespace,
 		key: string | number,
 		values: T[],
 	) {
@@ -110,7 +118,7 @@ export class RedisService {
 	 * @param max 유지할 최대 길이
 	 */
 	async lPushTrim<T>(
-		namespace: CacheNamespace,
+		namespace: ExpiringNamespace,
 		key: string | number,
 		value: T,
 		max: number,

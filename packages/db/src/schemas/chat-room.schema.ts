@@ -13,7 +13,7 @@ import { id, timestamps } from "./columns";
 import { messages } from "./message.schema";
 import { SelectUser, users } from "./user.schema";
 
-const chatRoomTypesEnum = pgEnum("chat_room_types_enum", [
+export const chatRoomTypesEnum = pgEnum("chat_room_types_enum", [
 	"DIRECT",
 	"GROUP",
 	"CHANNEL",

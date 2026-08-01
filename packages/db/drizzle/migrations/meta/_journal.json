@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1780920426814,
-      "tag": "0000_strong_absorbing_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1780934148806,
-      "tag": "0001_stormy_revanche",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1781077685928,
-      "tag": "0002_giant_zzzax",
+      "when": 1781257795994,
+      "tag": "0000_brief_dreadnoughts",
       "breakpoints": true
     }
   ]

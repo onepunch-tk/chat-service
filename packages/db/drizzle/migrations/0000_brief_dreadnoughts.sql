@@ -1,5 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
+CREATE TYPE "public"."chat_room_types_enum" AS ENUM('DIRECT', 'GROUP', 'CHANNEL');--> statement-breakpoint
 CREATE TYPE "public"."member_roles_enum" AS ENUM('OWNER', 'ADMIN', 'MEMBER');--> statement-breakpoint
 CREATE TYPE "public"."message_types_enum" AS ENUM('TEXT', 'SYSTEM');--> statement-breakpoint
 CREATE TABLE "chat_rooms" (
@@ -66,10 +67,13 @@ CREATE INDEX "idx_chat_room_created_by" ON "chat_rooms" USING btree ("created_by
 CREATE INDEX "idx_chat_room_type" ON "chat_rooms" USING btree ("type");--> statement-breakpoint
 CREATE INDEX "idx_chat_room_active" ON "chat_rooms" USING btree ("is_active");--> statement-breakpoint
 CREATE INDEX "idx_chat_room_updated_cursor" ON "chat_rooms" USING btree ("updated_at","id");--> statement-breakpoint
+CREATE INDEX "idx_chat_room_created_cursor" ON "chat_rooms" USING btree ("created_at","id");--> statement-breakpoint
 CREATE INDEX "idx_chat_room_name_tgram" ON "chat_rooms" USING gin ("name" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "idx_chat_room_member_user_id" ON "chat_room_members" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_chat_room_member_chat_room_id" ON "chat_room_members" USING btree ("chat_room_id");--> statement-breakpoint
 CREATE INDEX "idx_chat_room_member_active" ON "chat_room_members" USING btree ("is_active");--> statement-breakpoint
 CREATE INDEX "idx_chat_room_member_role" ON "chat_room_members" USING btree ("role");--> statement-breakpoint
 CREATE INDEX "idx_message_chat_room_id" ON "messages" USING btree ("chat_room_id");--> statement-breakpoint
-CREATE INDEX "idx_message_sender_id" ON "messages" USING btree ("sender_id");
+CREATE INDEX "idx_message_sender_id" ON "messages" USING btree ("sender_id");--> statement-breakpoint
+CREATE INDEX "idx_user_username_tgram" ON "users" USING gin ("username" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "idx_user_display_name_tgram" ON "users" USING gin ("display_name" gin_trgm_ops);

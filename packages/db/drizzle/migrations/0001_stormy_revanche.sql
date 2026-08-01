@@ -1,2 +1,0 @@
-CREATE INDEX "idx_user_username_tgram" ON "users" USING gin ("username" gin_trgm_ops);--> statement-breakpoint
-CREATE INDEX "idx_user_display_name_tgram" ON "users" USING gin ("display_name" gin_trgm_ops);

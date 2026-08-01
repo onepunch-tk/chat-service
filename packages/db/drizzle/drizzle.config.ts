@@ -19,5 +19,8 @@ export default defineConfig({
 		user: PG_USERNAME,
 		password: PG_PASSWORD,
 		database: PG_DBNAME,
+		// drizzle-kit은 ssl 미지정 시 {}(truthy)를 기본값으로 써서 SSL 접속을 시도한다.
+		// 로컬 PG는 SSL 미지원 → 에러는 TUI에 삼켜져 조용히 exit 1. 명시적으로 끈다.
+		ssl: false,
 	},
 });

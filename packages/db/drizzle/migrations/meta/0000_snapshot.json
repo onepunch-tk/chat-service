@@ -1,5 +1,5 @@
 {
-  "id": "e2a51693-12ca-489a-8892-7151cc383964",
+  "id": "3e5d9321-3df6-4c9d-85e6-31199be056e9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -144,6 +144,27 @@
           "columns": [
             {
               "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_chat_room_created_cursor": {
+          "name": "idx_chat_room_created_cursor",
+          "columns": [
+            {
+              "expression": "created_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -614,7 +635,40 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_user_username_tgram": {
+          "name": "idx_user_username_tgram",
+          "columns": [
+            {
+              "expression": "username",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "idx_user_display_name_tgram": {
+          "name": "idx_user_display_name_tgram",
+          "columns": [
+            {
+              "expression": "display_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "gin_trgm_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
@@ -632,6 +686,15 @@
     }
   },
   "enums": {
+    "public.chat_room_types_enum": {
+      "name": "chat_room_types_enum",
+      "schema": "public",
+      "values": [
+        "DIRECT",
+        "GROUP",
+        "CHANNEL"
+      ]
+    },
     "public.member_roles_enum": {
       "name": "member_roles_enum",
       "schema": "public",

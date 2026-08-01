@@ -25,12 +25,10 @@
 			"cache": false
 		},
 		"db:migrate": {
-			"cache": false,
-			"env": ["DATABASE_URL"]
+			"cache": false
 		},
 		"db:push": {
-			"cache": false,
-			"env": ["DATABASE_URL"]
+			"cache": false
 		},
 		"db:studio": {
 			"cache": false,

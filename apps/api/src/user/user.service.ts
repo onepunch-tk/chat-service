@@ -48,9 +48,6 @@ export class UserService {
 	}
 
 	async login(loginInput: LoginInput): Promise<UserDto> {
-		// username enumeration 방지: 사용자 없음/비밀번호 불일치를 동일한 BadRequest로 응답하고,
-		// 사용자가 없어도 더미 해시로 비교해 응답 시간을 평탄화한다(타이밍 누설 차단).
-		// (PK로 조회하는 getUserById/updateLastSeen은 리소스 조회라 의도적으로 NotFound를 던진다.)
 		const user = await this.userRepository.findByUsername(loginInput.username);
 		const ok = await this.cryptoService.isPasswordMatch(
 			loginInput.password,
